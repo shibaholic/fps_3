@@ -22,17 +22,13 @@
         },
         
         {
-            "type":"lldb",
-            "request":"launch",
-            "name":"cargo run",
+            "name": "cargo run",
+            "type": "pwa-node",
+            "request": "launch",
+            "runtimeExecutable": "cargo",
+            "runtimeArgs": ["run"],
             "cwd": "${workspaceFolder}",
-            "terminal": "integrated",
-            "cargo": {
-                "args": [
-                    "run",
-                ]
-            },
-            "preLaunchTask": "rust: cargo build"
+            "console": "integratedTerminal"
         },
 
         {
