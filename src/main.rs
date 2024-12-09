@@ -1,6 +1,10 @@
 use bevy::prelude::*;
-use my_crate::environment::EnvironmentPlugin;
-use my_crate::player::PlayerPlugin;
+use crate::environment::EnvironmentPlugin;
+use crate::player::PlayerPlugin;
+
+mod environment;
+mod player;
+mod constants;
 
 fn main() {
     App::new()
@@ -8,6 +12,7 @@ fn main() {
         .add_systems(Startup, startup)
         .add_plugins(EnvironmentPlugin)
         .add_plugins(PlayerPlugin)
+        .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new())
         .run();
 }
 

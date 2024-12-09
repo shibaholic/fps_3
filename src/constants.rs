@@ -1,0 +1,1 @@
+pub const ANGLE_EPSILON: f32 = 0.001953125;
