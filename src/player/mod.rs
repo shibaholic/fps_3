@@ -1,8 +1,8 @@
-use avian3d::{math::{Quaternion, Vector}, prelude::{CoefficientCombine, Collider, Friction, GravityScale, LockedAxes, Mass, Restitution, RigidBody, ShapeCaster}};
+use avian3d::{math::{Quaternion, Vector}, prelude::{CoefficientCombine, Collider, Friction, GravityScale, LockedAxes, Mass, Restitution, RigidBody, ShapeCaster, SleepingDisabled}};
 use bevy::{prelude::*};
 
 use component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, PlayerControls, PlayerInput, RenderPlayer};
-use system::{player_input, player_look, player_move, player_movement_damping, player_render};
+use system::{player_input, player_look, player_move, player_render};
 
 pub mod system;
 pub mod component;
@@ -13,12 +13,10 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_systems(Startup, spawn_player)
-        .add_systems(Update, (player_input, player_look,
-            player_move, 
-            player_movement_damping, 
+        .add_systems(PreUpdate, (player_input, player_look,
+            player_move, player_render
             ).chain()
         )
-        .add_systems(Update, player_render)
         ;
     }
 }
@@ -26,7 +24,8 @@ impl Plugin for PlayerPlugin {
 fn spawn_player(
     mut commands: Commands
 ) {
-    let collider = Collider::cylinder(0.5, 2.0);
+    let height = 3.0;
+    let collider = Collider::cylinder(0.5, height / 2.0);
     let mut caster_shape = collider.clone();
     caster_shape.set_scale(Vector::ONE * 0.99, 10);
 
@@ -49,7 +48,7 @@ fn spawn_player(
             Dir3::NEG_Y,
         ).with_max_distance(0.2),
         LockedAxes::ROTATION_LOCKED,
-
+        SleepingDisabled,
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         Mass(1.0)

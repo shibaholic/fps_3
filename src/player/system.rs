@@ -68,7 +68,7 @@ pub fn player_input(
 
     // TODO: jump, crouch
     player_input.fly = keyboard_input.just_pressed(player_controls.key_fly);
-    player_input.jump = keyboard_input.just_pressed(player_controls.key_jump);
+    player_input.jump = keyboard_input.pressed(player_controls.key_jump);
 }
 
 // transforms PlayerInput into LogicPlayerData for look only
@@ -163,7 +163,7 @@ pub fn player_move(
         }
 
         // TODO: crouch and sprint speed
-        let max_speed = player_props.sprint_speed;
+        let max_speed = player_props.walk_speed;
 
         wish_speed = f32::min(wish_speed, max_speed); 
 
@@ -184,9 +184,6 @@ pub fn player_move(
                 } else {
                     linear_velocity.0 = Vec3::ZERO;
                 }
-                if logical_controller.ground_tick == 1 {
-                    linear_velocity.y = 0.0; // for some reason, the other guy has something very weird
-                }
             }
 
             let mut add = accelerate(
@@ -197,20 +194,19 @@ pub fn player_move(
                 delta_time,
             );
             if !has_traction { // basically turns off gravity if surfing right?
-                info!("no traction");
+                // info!("no traction");
                 add.y -= player_props.gravity * delta_time;
             }
             linear_velocity.0 += add;
 
             if has_traction {
-                info!("traction");
                 let linear_velocity_2 = linear_velocity.0;
                 // (how much current velocity aligns with hit_normal) * in the direction of hit_normal.
                 linear_velocity.0 -= Vec3::dot(linear_velocity_2, shape_hit_data.normal1) * shape_hit_data.normal1;
 
                 if player_input.jump {
-                    info!("jump");
-                    linear_velocity.y = player_props.jump_impulse;
+                    linear_velocity.y += player_props.jump_impulse;
+                    // info!("jump")
                 }
             }
 
@@ -218,7 +214,7 @@ pub fn player_move(
             logical_controller.ground_tick = logical_controller.ground_tick.saturating_add(1);
         } else {
             // airborne
-            info!("airborne");
+            // info!("airborne");
 
             logical_controller.ground_tick = 0;
             wish_speed = f32::min(wish_speed, player_props.air_speed_cap);
@@ -240,14 +236,6 @@ pub fn player_move(
                 linear_velocity.z *= ratio;
             }
         }
-    }
-}
-
-pub fn player_movement_damping(mut query: Query<(&LogicalPlayerProperties, &mut LinearVelocity)>) {
-    for (player_props, mut linear_velocity) in &mut query {
-        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
-        linear_velocity.x *= player_props.damping_factor;
-        linear_velocity.z *= player_props.damping_factor;
     }
 }
 
