@@ -46,7 +46,7 @@ pub struct PlayerInput {
 
 #[derive(Component)]
 pub struct LogicalPlayerProperties {
-    pub fly_speed: f32
+    pub fly_speed: Scalar
 }
 
 impl Default for LogicalPlayerProperties {
@@ -127,3 +127,26 @@ pub struct MovementBundle {
     jump_impulse: JumpImpulse,
     max_slope_angle: MaxSlopeAngle,
 }
+
+impl MovementBundle {
+    pub const fn new(
+        acceleration: Scalar,
+        damping: Scalar,
+        jump_impulse: Scalar,
+        max_slope_angle: Scalar,
+    ) -> Self {
+        Self {
+            acceleration: MovementAcceleration(acceleration),
+            damping: MovementDampingFactor(damping),
+            jump_impulse: JumpImpulse(jump_impulse),
+            max_slope_angle: MaxSlopeAngle(max_slope_angle),
+        }
+    }
+}
+
+impl Default for MovementBundle {
+    fn default() -> Self {
+        Self::new(30.0, 0.9, 7.0, PI * 0.45)
+    }
+}
+

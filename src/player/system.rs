@@ -1,9 +1,10 @@
+use avian3d::prelude::LinearVelocity;
 use bevy::{input::mouse::MouseMotion, prelude::*};
 
 use std::f32::consts::FRAC_PI_2;
 
 use crate::constants::*;
-use super::component::{LogicalPlayer, LogicalPlayerController, PlayerControls, PlayerInput, RenderPlayer, MoveMode};
+use super::component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, MoveMode, PlayerControls, PlayerInput, RenderPlayer};
 
 // transforms raw input into PlayerInput
 pub fn player_input(
@@ -49,7 +50,7 @@ pub fn player_input(
     }
 
     player_input.movement = Vec3::new(
-        get_axis(&keyboard_input, player_controls.key_left, player_controls.key_right),
+        get_axis(&keyboard_input, player_controls.key_right, player_controls.key_left),
         get_axis(&keyboard_input, player_controls.key_up, player_controls.key_down),
         get_axis(&keyboard_input, player_controls.key_forward, player_controls.key_backward)
     );
@@ -78,9 +79,10 @@ pub fn player_look(
 // transforms PlayerInput + a little LogicPlayerController (look) into LogicPlayerController (move)
 pub fn player_move(
     time: Res<Time>,
-    mut query: Query<(&PlayerInput, &mut LogicalPlayerController)>
+    mut query: Query<(&PlayerInput, &LogicalPlayerProperties, &LogicalPlayerController, &mut LinearVelocity)>
 ) {
-    let Ok((player_input, mut logical_controller)) = query.get_single_mut() else {
+    let Ok((player_input, player_props, logical_controller, mut linear_velocity)) = 
+    query.get_single_mut() else {
         return;
     };
 
@@ -92,7 +94,12 @@ pub fn player_move(
     // }
 
     if logical_controller.move_mode == MoveMode::Noclip {
-
+        info!("yaw: {}; pitch: {}", logical_controller.yaw, logical_controller.pitch);
+        let mut move_to_world = Mat3::from_euler(EulerRot::YXZ, logical_controller.yaw, logical_controller.pitch, 0.0);
+        move_to_world.z_axis *= -1.0; // Forward is -Z
+        move_to_world.y_axis = Vec3::Y; // Up is Y
+        linear_velocity.0 = move_to_world * player_input.movement * player_props.fly_speed;
+        info!("linvel.0 {:?}", linear_velocity.0);
     }
 }
 

@@ -1,6 +1,7 @@
-use bevy::{prelude::*, render::camera::Exposure};
+use avian3d::prelude::RigidBody;
+use bevy::{prelude::*};
 
-use component::{LogicalPlayer, LogicalPlayerController, PlayerControls, PlayerInput, RenderPlayer};
+use component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, PlayerControls, PlayerInput, RenderPlayer};
 use system::{player_input, player_look, player_move, player_render};
 
 pub mod system;
@@ -12,7 +13,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_systems(Startup, spawn_player)
-        // .add_systems(Update, (player_input, player_look, player_move, player_render))
+        .add_systems(Update, (player_input, player_look, player_move, player_render).chain())
         ;
     }
 }
@@ -24,11 +25,12 @@ fn spawn_player(
     let logical_player = commands.spawn((
         Transform::from_xyz(0.0, 4.0, 0.0),
         LogicalPlayer,
+        LogicalPlayerProperties::default(),
         LogicalPlayerController::default(),
         PlayerControls::default(),
         PlayerInput::default(),
         
-        // RigidBody,
+        RigidBody::Kinematic,
         // Collider,
         
     ))
@@ -42,9 +44,7 @@ fn spawn_player(
             fov: 90.0_f32.to_radians(),
             ..default()
         }),
-        Exposure::SUNLIGHT,
         Transform::from_xyz(0.0, 4.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-
         RenderPlayer { logical_entity: logical_player }
     ))
     .insert(Name::new("RenderPlayer"));
