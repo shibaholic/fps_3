@@ -1,8 +1,8 @@
-use avian3d::prelude::RigidBody;
+use avian3d::prelude::{CoefficientCombine, Collider, Friction, Restitution, RigidBody};
 use bevy::{prelude::*};
 
 use component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, PlayerControls, PlayerInput, RenderPlayer};
-use system::{player_input, player_look, player_move, player_render};
+use system::{player_input, player_look, player_move, player_movement_damping, player_render};
 
 pub mod system;
 pub mod component;
@@ -13,7 +13,9 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_systems(Startup, spawn_player)
-        .add_systems(Update, (player_input, player_look, player_move, player_render).chain())
+        .add_systems(Update, (player_input, player_look, 
+            // player_gravity, 
+            player_move, player_movement_damping, player_render).chain())
         ;
     }
 }
@@ -30,8 +32,11 @@ fn spawn_player(
         PlayerControls::default(),
         PlayerInput::default(),
         
-        RigidBody::Kinematic,
-        // Collider,
+        RigidBody::Dynamic,
+        Collider::capsule(0.4, 1.0),
+
+        Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min)
         
     ))
     .insert(Name::new("LogicalPlayer"))

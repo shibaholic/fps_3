@@ -55,7 +55,8 @@ pub fn player_input(
         get_axis(&keyboard_input, player_controls.key_forward, player_controls.key_backward)
     );
 
-    // TODO: jump, crouch, fly
+    // TODO: jump, crouch
+    player_input.fly = keyboard_input.just_pressed(player_controls.key_fly);
 }
 
 // transforms PlayerInput into LogicPlayerData for look only
@@ -78,28 +79,37 @@ pub fn player_look(
 
 // transforms PlayerInput + a little LogicPlayerController (look) into LogicPlayerController (move)
 pub fn player_move(
-    time: Res<Time>,
-    mut query: Query<(&PlayerInput, &LogicalPlayerProperties, &LogicalPlayerController, &mut LinearVelocity)>
+    mut query: Query<(&PlayerInput, &LogicalPlayerProperties, &mut LogicalPlayerController, &mut LinearVelocity)>
 ) {
-    let Ok((player_input, player_props, logical_controller, mut linear_velocity)) = 
+    let Ok((player_input, player_props, mut logical_controller, mut linear_velocity)) = 
     query.get_single_mut() else {
         return;
     };
 
-    // if player_input.fly {
-    //     logical_controller.move_mode = match logical_controller.move_mode {
-    //         MoveMode::Noclip => MoveMode::Ground,
-    //         MoveMode::Ground => MoveMode::Noclip
-    //     }
-    // }
+    if player_input.fly {
+        logical_controller.move_mode = match logical_controller.move_mode {
+            MoveMode::Noclip => MoveMode::Ground,
+            MoveMode::Ground => MoveMode::Noclip
+        }
+    }
 
     if logical_controller.move_mode == MoveMode::Noclip {
-        info!("yaw: {}; pitch: {}", logical_controller.yaw, logical_controller.pitch);
         let mut move_to_world = Mat3::from_euler(EulerRot::YXZ, logical_controller.yaw, logical_controller.pitch, 0.0);
         move_to_world.z_axis *= -1.0; // Forward is -Z
         move_to_world.y_axis = Vec3::Y; // Up is Y
         linear_velocity.0 = move_to_world * player_input.movement * player_props.fly_speed;
-        info!("linvel.0 {:?}", linear_velocity.0);
+    } else if logical_controller.move_mode == MoveMode::Ground {
+        let mut move_to_world = Mat3::from_euler(EulerRot::YXZ, logical_controller.yaw, 0.0, 0.0);
+        move_to_world.z_axis *= -1.0; // Forward is -Z
+        linear_velocity.0 = move_to_world * player_input.movement * player_props.fly_speed;
+    }
+}
+
+pub fn player_movement_damping(mut query: Query<(&LogicalPlayerProperties, &mut LinearVelocity)>) {
+    for (player_props, mut linear_velocity) in &mut query {
+        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
+        linear_velocity.x *= player_props.damping_factor;
+        linear_velocity.z *= player_props.damping_factor;
     }
 }
 

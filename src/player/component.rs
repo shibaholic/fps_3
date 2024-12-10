@@ -15,7 +15,9 @@ pub struct PlayerControls {
     pub key_forward: KeyCode,
     pub key_backward: KeyCode,
     pub key_up: KeyCode,
-    pub key_down: KeyCode
+    pub key_down: KeyCode,
+
+    pub key_fly: KeyCode,
 }
 
 impl Default for PlayerControls {
@@ -27,7 +29,9 @@ impl Default for PlayerControls {
             key_forward: KeyCode::KeyW,
             key_backward: KeyCode::KeyS,
             key_up: KeyCode::KeyQ,
-            key_down: KeyCode::KeyE
+            key_down: KeyCode::KeyE,
+
+            key_fly: KeyCode::KeyF
         }
     }
 }
@@ -46,13 +50,17 @@ pub struct PlayerInput {
 
 #[derive(Component)]
 pub struct LogicalPlayerProperties {
-    pub fly_speed: Scalar
+    pub fly_speed: Scalar,
+    pub gravity: Vector,
+    pub damping_factor: Scalar,
 }
 
 impl Default for LogicalPlayerProperties {
     fn default() -> Self {
         Self {
-            fly_speed: 10.0
+            fly_speed: 10.0,
+            gravity: Vector::NEG_Y * 9.81 * 0.1,
+            damping_factor: 0.92
         }
     }
 }
@@ -84,69 +92,3 @@ pub struct LogicalPlayerController {
 pub struct RenderPlayer {
     pub logical_entity: Entity,
 }
-
-// Avian3D Physics Bundles
-
-/// The acceleration used for character movement.
-#[derive(Component)]
-pub struct MovementAcceleration(Scalar);
-
-/// The damping factor used for slowing down movement.
-#[derive(Component)]
-pub struct MovementDampingFactor(Scalar);
-
-/// The strength of a jump.
-#[derive(Component)]
-pub struct JumpImpulse(Scalar);
-
-/// The gravitational acceleration used for a character controller.
-#[derive(Component)]
-pub struct ControllerGravity(Vector);
-
-/// The maximum angle a slope can have for a character controller
-/// to be able to climb and jump. If the slope is steeper than this angle,
-/// the character will slide down.
-#[derive(Component)]
-pub struct MaxSlopeAngle(Scalar);
-
-// A bundle to add kinematic physics to the player controller.
-#[derive(Bundle)]
-pub struct KinematicBundle {
-    rigid_body: RigidBody,
-    collider: Collider,
-    ground_caster: ShapeCaster,
-    gravity: ControllerGravity,
-    movement: MovementBundle,
-}
-
-// A bundle that contains components for character movement.
-#[derive(Bundle)]
-pub struct MovementBundle {
-    acceleration: MovementAcceleration,
-    damping: MovementDampingFactor,
-    jump_impulse: JumpImpulse,
-    max_slope_angle: MaxSlopeAngle,
-}
-
-impl MovementBundle {
-    pub const fn new(
-        acceleration: Scalar,
-        damping: Scalar,
-        jump_impulse: Scalar,
-        max_slope_angle: Scalar,
-    ) -> Self {
-        Self {
-            acceleration: MovementAcceleration(acceleration),
-            damping: MovementDampingFactor(damping),
-            jump_impulse: JumpImpulse(jump_impulse),
-            max_slope_angle: MaxSlopeAngle(max_slope_angle),
-        }
-    }
-}
-
-impl Default for MovementBundle {
-    fn default() -> Self {
-        Self::new(30.0, 0.9, 7.0, PI * 0.45)
-    }
-}
-

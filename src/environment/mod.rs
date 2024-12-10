@@ -1,3 +1,4 @@
+use avian3d::prelude::{Collider, ColliderConstructor, ColliderConstructorHierarchy, RigidBody};
 use bevy::{color::palettes::tailwind, prelude::*};
 pub struct EnvironmentPlugin;
 
@@ -14,25 +15,37 @@ fn spawn_world_model(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let floor = meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(10.0)));
-    let cube = meshes.add(Cuboid::new(2.0, 0.5, 1.0));
+    let floor = meshes.add(Cuboid::new(20.0, 1.0, 20.0));
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let material = materials.add(Color::WHITE);
 
     // The world model camera will render the floor and the cubes spawned in this system.
     // Assigning no `RenderLayers` component defaults to layer 0.
 
-    commands.spawn((Mesh3d(floor), MeshMaterial3d(material.clone())));
+    commands.spawn((
+        Mesh3d(floor), 
+        MeshMaterial3d(material.clone()),
+        // ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
+        Collider::cuboid(20.0, 1.0, 20.0),
+        RigidBody::Static
+    ));
 
     commands.spawn((
         Mesh3d(cube.clone()),
         MeshMaterial3d(material.clone()),
-        Transform::from_xyz(0.0, 0.25, -3.0),
+        Transform::from_xyz(0.0, 4.0, -3.0),
+
+        Collider::cuboid(1.0, 1.0, 1.0),
+        RigidBody::Dynamic
     ));
 
     commands.spawn((
         Mesh3d(cube),
         MeshMaterial3d(material),
-        Transform::from_xyz(0.75, 1.75, 0.0),
+        Transform::from_xyz(0.75, 4.0, 0.0),
+
+        Collider::cuboid(1.0, 1.0, 1.0),
+        RigidBody::Dynamic
     ));
 }
 
