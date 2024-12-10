@@ -18,6 +18,7 @@ pub struct PlayerControls {
     pub key_down: KeyCode,
 
     pub key_fly: KeyCode,
+    pub key_jump: KeyCode,
 }
 
 impl Default for PlayerControls {
@@ -31,7 +32,8 @@ impl Default for PlayerControls {
             key_up: KeyCode::KeyQ,
             key_down: KeyCode::KeyE,
 
-            key_fly: KeyCode::KeyF
+            key_fly: KeyCode::KeyF,
+            key_jump: KeyCode::Space,
         }
     }
 }
@@ -50,17 +52,21 @@ pub struct PlayerInput {
 
 #[derive(Component)]
 pub struct LogicalPlayerProperties {
-    pub fly_speed: Scalar,
-    pub gravity: Vector,
+    pub fly_velocity: Scalar,
+    pub walk_accel: Scalar,
     pub damping_factor: Scalar,
+    pub jump_impulse: Scalar,
+    pub max_slope_angle: Scalar,
 }
 
 impl Default for LogicalPlayerProperties {
     fn default() -> Self {
         Self {
-            fly_speed: 10.0,
-            gravity: Vector::NEG_Y * 9.81 * 0.1,
-            damping_factor: 0.92
+            fly_velocity: 30.0,
+            walk_accel: 30.0,
+            damping_factor: 0.92,
+            jump_impulse: 5.0,
+            max_slope_angle: (30.0 as Scalar).to_radians(),
         }
     }
 }
@@ -86,6 +92,9 @@ pub struct LogicalPlayerController {
     pub pitch: f32,
     pub yaw: f32,
 }
+
+#[derive(Component, Reflect)]
+pub struct Grounded;
 
 // Render player component flag and parent to LogicalPlayer entity
 #[derive(Component)]

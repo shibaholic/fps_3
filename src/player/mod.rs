@@ -1,8 +1,10 @@
-use avian3d::prelude::{CoefficientCombine, Collider, Friction, Restitution, RigidBody};
+use avian3d::{math::{Quaternion, Vector}, prelude::{CoefficientCombine, Collider, Friction, GravityScale, LockedAxes, Restitution, RigidBody, ShapeCaster}};
 use bevy::{prelude::*};
 
 use component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, PlayerControls, PlayerInput, RenderPlayer};
-use system::{player_input, player_look, player_move, player_movement_damping, player_render};
+use system::{player_input, player_look, player_move, player_movement_damping, player_render, update_grounded};
+
+use crate::CursorLocked;
 
 pub mod system;
 pub mod component;
@@ -14,8 +16,12 @@ impl Plugin for PlayerPlugin {
         app
         .add_systems(Startup, spawn_player)
         .add_systems(Update, (player_input, player_look, 
-            // player_gravity, 
-            player_move, player_movement_damping, player_render).chain())
+            update_grounded,
+            player_move, 
+            player_movement_damping, 
+            ).chain()
+        )
+        .add_systems(Update, player_render)
         ;
     }
 }
@@ -23,6 +29,10 @@ impl Plugin for PlayerPlugin {
 fn spawn_player(
     mut commands: Commands
 ) {
+    let collider = Collider::cylinder(0.5, 2.0);
+    let mut caster_shape = collider.clone();
+    caster_shape.set_scale(Vector::ONE * 0.99, 10);
+
     // logical player entity
     let logical_player = commands.spawn((
         Transform::from_xyz(0.0, 4.0, 0.0),
@@ -33,7 +43,15 @@ fn spawn_player(
         PlayerInput::default(),
         
         RigidBody::Dynamic,
-        Collider::capsule(0.4, 1.0),
+        collider,
+        GravityScale(1.5),
+        ShapeCaster::new(
+            caster_shape,
+            Vector::ZERO,
+            Quaternion::default(),
+            Dir3::NEG_Y,
+        ).with_max_distance(0.2),
+        LockedAxes::ROTATION_LOCKED,
 
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min)
