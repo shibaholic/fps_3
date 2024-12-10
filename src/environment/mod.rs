@@ -14,8 +14,9 @@ fn spawn_world_model(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>
 ) {
-    let floor = meshes.add(Cuboid::new(20.0, 1.0, 20.0));
+    // let floor = meshes.add(Cuboid::new(20.0, 1.0, 20.0));
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let material = materials.add(Color::WHITE);
 
@@ -23,10 +24,9 @@ fn spawn_world_model(
     // Assigning no `RenderLayers` component defaults to layer 0.
 
     commands.spawn((
-        Mesh3d(floor), 
-        MeshMaterial3d(material.clone()),
-        // ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
-        Collider::cuboid(20.0, 1.0, 20.0),
+        SceneRoot(assets.load("character_controller_demo.glb#Scene0")),
+        Transform::from_rotation(Quat::from_rotation_y(-std::f32::consts::PI * 0.5)),
+        ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
         RigidBody::Static
     ));
 
@@ -52,12 +52,23 @@ fn spawn_world_model(
 fn spawn_lights(mut commands: Commands) {
     commands.spawn((
         PointLight {
-            color: Color::from(tailwind::ROSE_300),
+            color: Color::from(tailwind::NEUTRAL_950),
             shadows_enabled: true,
             ..default()
         },
         Transform::from_xyz(-2.0, 4.0, -0.75),
         // The light source illuminates both the world model and the view model.
         // RenderLayers::from_layers(&[DEFAULT_RENDER_LAYER, VIEW_MODEL_RENDER_LAYER]),
+    ));
+
+    // Light
+    commands.spawn((
+        PointLight {
+            intensity: 2_000_000.0,
+            range: 50.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(0.0, 15.0, 0.0),
     ));
 }
