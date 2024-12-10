@@ -1,10 +1,15 @@
-use avian3d::{math::*, prelude::*};
-use bevy::{input::mouse::MouseMotion, prelude::*};
+use avian3d::{math::*, parry::query::ShapeCastHit, prelude::*};
+use bevy::{ecs::query::QueryFilter, input::mouse::MouseMotion, prelude::*};
 
 use std::f32::consts::FRAC_PI_2;
 
 use crate::{constants::*, CursorLocked};
-use super::component::{Grounded, LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, MoveMode, PlayerControls, PlayerInput, RenderPlayer};
+use super::component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, MoveMode, PlayerControls, PlayerInput, RenderPlayer};
+
+// If the distance to the ground is less than this value, the player is considered grounded
+const GROUNDED_DISTANCE: f32 = 0.125;
+
+const SLIGHT_SCALE_DOWN: f32 = 0.9375;
 
 // transforms raw input into PlayerInput
 pub fn player_input(
@@ -83,41 +88,29 @@ pub fn player_look(
 
     logical_controller.pitch = (logical_controller.pitch + player_input.pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
 }
-/// Updates the [`Grounded`] status for character controllers.
-pub fn update_grounded(
-    mut commands: Commands,
-    mut query: Query<(Entity, &ShapeHits, &Rotation, &LogicalPlayerProperties)>,
-) {
-    for (entity, hits, rotation, player_props) in &mut query {
-        // The character is grounded if the shape caster has a hit with a normal
-        // that isn't too steep.
-        let is_grounded = hits.iter().any(|hit| {
-            (rotation * -hit.normal2).angle_between(Vector::Y).abs() <= player_props.max_slope_angle
-        });
-
-        info!("update grounded");
-
-        if is_grounded {
-            info!("add grounded");
-            commands.entity(entity).insert(Grounded);
-        } else {
-            info!("remove grounded");
-            commands.entity(entity).remove::<Grounded>();
-        }
-    }
-}
 
 // transforms PlayerInput + a little LogicPlayerController (look) into LogicPlayerController (move)
 pub fn player_move(
     time: Res<Time>,
-    mut query: Query<(&mut GravityScale, &PlayerInput, &LogicalPlayerProperties, &mut LogicalPlayerController, &mut LinearVelocity, Has<Grounded>)>
+    spatial_query: SpatialQuery,
+    mut query: Query<(
+        Entity, 
+        &Transform,
+        &Collider,
+        &PlayerInput, 
+        &LogicalPlayerProperties, 
+        &mut LogicalPlayerController, 
+        &mut LinearVelocity, 
+    )>
 ) {
-    let Ok((mut gravity_scale, 
+    let Ok((
+        entity,
+        transform,
+        collider,
         player_input, 
         player_props, 
         mut logical_controller, 
-        mut linear_velocity,
-        grounded)) = 
+        mut linear_velocity,)) = 
     query.get_single_mut() else {
         return;
     };
@@ -127,11 +120,11 @@ pub fn player_move(
     if player_input.fly {
         logical_controller.move_mode = match logical_controller.move_mode {
             MoveMode::Noclip => {
-                gravity_scale.0 = 1.0;
+                // gravity_scale.0 = 1.0;
                 MoveMode::Ground
             },
             MoveMode::Ground => {
-                gravity_scale.0 = 0.0;
+                // gravity_scale.0 = 0.0;
                 MoveMode::Noclip
             }
         }
@@ -144,12 +137,108 @@ pub fn player_move(
         linear_velocity.0 = move_to_world * player_input.movement * player_props.fly_velocity;
 
     } else if logical_controller.move_mode == MoveMode::Ground {
-        let mut move_to_world = Mat3::from_euler(EulerRot::YXZ, logical_controller.yaw, 0.0, 0.0);
-        move_to_world.z_axis *= -1.0; // Forward is -Z
-        linear_velocity.0 += move_to_world * player_input.movement.with_y(0.0) * player_props.walk_accel * delta_time;
+        // shape cast towards ground
+        let filter = SpatialQueryFilter::default().with_excluded_entities([entity]);
+        let config = ShapeCastConfig::from_max_distance(GROUNDED_DISTANCE);
+        let ground_cast = spatial_query.cast_shape(
+            &scaled_collider_laterally(&collider, SLIGHT_SCALE_DOWN),
+            transform.translation,
+            transform.rotation,
+            -Dir3::Y,
+            &config,
+            &filter
+        );
 
-        if player_input.jump && grounded {
-            linear_velocity.y += player_props.jump_impulse;
+        // Source engine movement
+
+        let speeds = Vec3::new(player_props.side_speed, 0.0, player_props.forward_speed);
+        let mut move_to_world = Mat3::from_axis_angle(Vec3::Y, logical_controller.yaw);
+        move_to_world.z_axis *= -1.0; // Forward is -Z
+        let mut wish_direction = move_to_world * (player_input.movement * speeds); 
+        let mut wish_speed = wish_direction.length();
+
+        if wish_speed > f32::EPSILON {
+            // avoid division by zero
+            wish_direction /= wish_speed; // effectively normalizes to unit circle, avoiding length computation twice
+        }
+
+        // TODO: crouch and sprint speed
+        let max_speed = player_props.sprint_speed;
+
+        wish_speed = f32::min(wish_speed, max_speed); 
+
+        if let Some(shape_hit_data) = ground_cast {
+            // on the ground
+
+            let has_traction = Vec3::dot(shape_hit_data.normal1, Vec3::Y) > player_props.traction_normal_cutoff;
+
+            // only apply friction after at least one tick, allows b-hopping without losing speed
+            if logical_controller.ground_tick >= 1 && has_traction {
+                let lateral_speed = linear_velocity.xz().length();
+                if lateral_speed > player_props.friction_speed_cutoff {
+                    let control = f32::max(lateral_speed, player_props.stop_speed);
+                    let drop = control * player_props.friction * delta_time;
+                    let new_speed = f32::max((lateral_speed - drop) / lateral_speed, 0.0);
+                    linear_velocity.x *= new_speed;
+                    linear_velocity.z *= new_speed;
+                } else {
+                    linear_velocity.0 = Vec3::ZERO;
+                }
+                if logical_controller.ground_tick == 1 {
+                    linear_velocity.y = 0.0; // for some reason, the other guy has something very weird
+                }
+            }
+
+            let mut add = accelerate(
+                wish_direction,
+                wish_speed,
+                player_props.acceleration,
+                linear_velocity.0,
+                delta_time,
+            );
+            if !has_traction { // basically turns off gravity if surfing right?
+                info!("no traction");
+                add.y -= player_props.gravity * delta_time;
+            }
+            linear_velocity.0 += add;
+
+            if has_traction {
+                info!("traction");
+                let linear_velocity_2 = linear_velocity.0;
+                // (how much current velocity aligns with hit_normal) * in the direction of hit_normal.
+                linear_velocity.0 -= Vec3::dot(linear_velocity_2, shape_hit_data.normal1) * shape_hit_data.normal1;
+
+                if player_input.jump {
+                    info!("jump");
+                    linear_velocity.y = player_props.jump_impulse;
+                }
+            }
+
+            // Increment ground tick but cap at max value
+            logical_controller.ground_tick = logical_controller.ground_tick.saturating_add(1);
+        } else {
+            // airborne
+            info!("airborne");
+
+            logical_controller.ground_tick = 0;
+            wish_speed = f32::min(wish_speed, player_props.air_speed_cap);
+
+            let mut add = accelerate(
+                wish_direction,
+                wish_speed,
+                player_props.air_acceleration,
+                linear_velocity.0,
+                delta_time,
+            );
+            add.y = -player_props.gravity * delta_time;
+            linear_velocity.0 += add;
+
+            let air_speed = linear_velocity.xz().length();
+            if air_speed > player_props.max_air_speed {
+                let ratio = player_props.max_air_speed / air_speed;
+                linear_velocity.x *= ratio;
+                linear_velocity.z *= ratio;
+            }
         }
     }
 }
@@ -192,4 +281,32 @@ fn collider_y_offset(collider: &Collider) -> Vec3 {
     } else {
         panic!("Controller must use a cylinder collider")
     }
+}
+
+/// Return a collider that is scaled laterally (XZ plane) but not vertically (Y axis).
+fn scaled_collider_laterally(collider: &Collider, scale: f32) -> Collider {
+    if let Some(cylinder) = collider.shape().as_cylinder() {
+        let new_cylinder = Collider::cylinder(cylinder.radius * scale, cylinder.half_height * 2.0);
+        new_cylinder
+    } else {
+        panic!("Controller must use a cylinder  collider")
+    }
+}
+
+
+fn accelerate(
+    wish_direction: Vec3,
+    wish_speed: f32,
+    acceleration: f32,
+    velocity: Vec3,
+    dt: f32,
+) -> Vec3 {
+    let velocity_projection = Vec3::dot(velocity, wish_direction);
+    let add_speed = wish_speed - velocity_projection;
+    if add_speed <= 0.0 {
+        return Vec3::ZERO;
+    }
+
+    let acceleration_speed = f32::min(acceleration * wish_speed * dt, add_speed);
+    wish_direction * acceleration_speed
 }

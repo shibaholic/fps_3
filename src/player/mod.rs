@@ -1,10 +1,8 @@
-use avian3d::{math::{Quaternion, Vector}, prelude::{CoefficientCombine, Collider, Friction, GravityScale, LockedAxes, Restitution, RigidBody, ShapeCaster}};
+use avian3d::{math::{Quaternion, Vector}, prelude::{CoefficientCombine, Collider, Friction, GravityScale, LockedAxes, Mass, Restitution, RigidBody, ShapeCaster}};
 use bevy::{prelude::*};
 
 use component::{LogicalPlayer, LogicalPlayerController, LogicalPlayerProperties, PlayerControls, PlayerInput, RenderPlayer};
-use system::{player_input, player_look, player_move, player_movement_damping, player_render, update_grounded};
-
-use crate::CursorLocked;
+use system::{player_input, player_look, player_move, player_movement_damping, player_render};
 
 pub mod system;
 pub mod component;
@@ -15,8 +13,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_systems(Startup, spawn_player)
-        .add_systems(Update, (player_input, player_look, 
-            update_grounded,
+        .add_systems(Update, (player_input, player_look,
             player_move, 
             player_movement_damping, 
             ).chain()
@@ -44,7 +41,7 @@ fn spawn_player(
         
         RigidBody::Dynamic,
         collider,
-        GravityScale(1.5),
+        GravityScale(0.0), // gravity is handled in player_move(), so surfing is supported.
         ShapeCaster::new(
             caster_shape,
             Vector::ZERO,
@@ -54,7 +51,8 @@ fn spawn_player(
         LockedAxes::ROTATION_LOCKED,
 
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
-        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min)
+        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Mass(1.0)
         
     ))
     .insert(Name::new("LogicalPlayer"))

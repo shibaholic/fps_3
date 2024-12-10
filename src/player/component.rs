@@ -57,6 +57,27 @@ pub struct LogicalPlayerProperties {
     pub damping_factor: Scalar,
     pub jump_impulse: Scalar,
     pub max_slope_angle: Scalar,
+    
+    pub forward_speed: f32, // is this like the maximum speed?
+    pub side_speed: f32,
+
+    pub crouch_speed: f32,
+    pub sprint_speed: f32,
+    pub walk_speed: f32,
+
+    pub traction_normal_cutoff: f32,
+    pub friction_speed_cutoff: f32,
+    pub stop_speed: f32,
+    
+    pub friction:f32,
+    pub acceleration: f32,
+
+    pub gravity:f32,
+
+    pub air_speed_cap:f32,
+    pub air_acceleration: f32,
+    pub max_air_speed: f32,
+
 }
 
 impl Default for LogicalPlayerProperties {
@@ -65,8 +86,28 @@ impl Default for LogicalPlayerProperties {
             fly_velocity: 30.0,
             walk_accel: 30.0,
             damping_factor: 0.92,
-            jump_impulse: 5.0,
+            jump_impulse: 8.5,
             max_slope_angle: (30.0 as Scalar).to_radians(),
+
+            forward_speed: 30.0,
+            side_speed: 30.0,
+
+            crouch_speed: 5.0,
+            sprint_speed: 14.0,
+            walk_speed: 9.0,
+
+            traction_normal_cutoff: 0.7,
+            friction_speed_cutoff: 0.1,
+            stop_speed: 1.0,
+
+            friction:10.0,
+            acceleration: 10.0,
+
+            gravity: 23.0,
+
+            air_speed_cap: 2.0,
+            air_acceleration: 20.0,
+            max_air_speed: 15.0,
         }
     }
 }
@@ -91,10 +132,8 @@ pub struct LogicalPlayerController {
     
     pub pitch: f32,
     pub yaw: f32,
+    pub ground_tick: u8,
 }
-
-#[derive(Component, Reflect)]
-pub struct Grounded;
 
 // Render player component flag and parent to LogicalPlayer entity
 #[derive(Component)]
